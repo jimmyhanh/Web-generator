@@ -1,0 +1,497 @@
+Here’s a complete, single-file website you can save as index.html. Open it in a browser and start tossing tables around. No libraries required.
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Throw Tables!</title>
+  <style>
+    :root {
+      --bg1: #0f1220;
+      --bg2: #1c2140;
+      --accent: #7bd1ff;
+      --accent2: #ff9fd8;
+      --panel: rgba(255,255,255,0.08);
+      --text: #e8f1ff;
+    }
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: radial-gradient(1200px 800px at 20% 10%, var(--bg2), var(--bg1) 60%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    header {
+      position: fixed;
+      top: 12px; left: 12px; right: 12px;
+      display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 10px 12px;
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+    }
+    header h1 {
+      margin: 0 8px 0 4px;
+      font-size: 18px; font-weight: 700; letter-spacing: 0.3px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    header .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    button, .chip {
+      background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06));
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font: inherit;
+      cursor: pointer;
+      transition: transform .06s ease, background .2s ease, box-shadow .2s ease;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+    }
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0px) scale(0.98); }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px; padding-right: 10px;
+    }
+    .chip input { accent-color: var(--accent); }
+
+    .slider {
+      display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px;
+      border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; background: var(--panel);
+    }
+    .slider input[type=range] { width: 140px; }
+
+    #arena {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    /* Table "objects" */
+    .thing {
+      position: absolute;
+      transform-origin: center center;
+      will-change: transform;
+      touch-action: none;
+      cursor: grab;
+      filter: drop-shadow(0 8px 20px rgba(0,0,0,0.45));
+      transition: filter .12s ease;
+    }
+    .thing.dragging {
+      cursor: grabbing;
+      filter: drop-shadow(0 14px 28px rgba(0,0,0,0.55));
+    }
+
+    .tbl {
+      border-collapse: collapse;
+      background: #ffffff;
+      color: #202531;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid #cfd7ff;
+      min-width: 160px;
+      font-size: 14px;
+    }
+    .tbl th {
+      background: linear-gradient(180deg, #f2f6ff, #e6eeff);
+      color: #273049;
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid #d6dfff;
+      font-weight: 700;
+    }
+    .tbl td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #eef2ff;
+    }
+    .tbl tr:last-child td { border-bottom: none; }
+
+    /* HUD */
+    #hud {
+      position: fixed;
+      left: 12px; bottom: 12px;
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 10px 12px;
+      backdrop-filter: blur(8px);
+      font-size: 13px;
+      display: flex; gap: 16px; align-items: center;
+      z-index: 1000;
+    }
+    #hud b { color: #cfe8ff; }
+
+    /* Fun corner */
+    #corner {
+      position: fixed; right: 12px; bottom: 12px;
+      font-size: 20px;
+      opacity: 0.85;
+      user-select: text;
+    }
+
+    a.link {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(123,209,255,0.5);
+    }
+    a.link:hover { color: #fff; border-bottom-color: #fff; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🪑 Throw Tables!</h1>
+    <div class="controls">
+      <button id="btnAdd">Add Table</button>
+      <button id="btnMany">Add 5</button>
+      <button id="btnFlip">Flip All</button>
+      <button id="btnClear">Clear</button>
+      <span class="slider">
+        <label for="grav">Gravity</label>
+        <input id="grav" type="range" min="0" max="3000" step="50" value="2000" />
+        <span id="gravVal">2000</span>
+      </span>
+      <span class="chip">
+        <input id="chaos" type="checkbox" />
+        <label for="chaos">Chaos mode</label>
+      </span>
+    </div>
+  </header>
+
+  <div id="arena" aria-label="Physics arena for throwing tables"></div>
+
+  <div id="hud">
+    <span>Tables: <b id="statCount">0</b></span>
+    <span>Throws: <b id="statThrows">0</b></span>
+    <span>Bounces: <b id="statBounces">0</b></span>
+    <span>Top Speed: <b id="statTop">0</b> px/s</span>
+  </div>
+
+  <div id="corner">(╯°□°）╯︵ ┻━┻</div>
+
+  <script>
+    // Simple DOM-physics for flinging HTML <table> elements around.
+    (() => {
+      const arena = document.getElementById('arena');
+      const btnAdd = document.getElementById('btnAdd');
+      const btnMany = document.getElementById('btnMany');
+      const btnFlip = document.getElementById('btnFlip');
+      const btnClear = document.getElementById('btnClear');
+      const grav = document.getElementById('grav');
+      const gravVal = document.getElementById('gravVal');
+      const chaos = document.getElementById('chaos');
+
+      const statCount = document.getElementById('statCount');
+      const statThrows = document.getElementById('statThrows');
+      const statBounces = document.getElementById('statBounces');
+      const statTop = document.getElementById('statTop');
+
+      let bounds = arena.getBoundingClientRect();
+
+      let nextId = 1;
+      const things = new Map(); // id -> body
+      const maxThings = 80;
+
+      let gravity = parseFloat(grav.value);
+      grav.addEventListener('input', () => {
+        gravity = parseFloat(grav.value);
+        gravVal.textContent = grav.value;
+      });
+
+      const R = (min, max) => Math.random() * (max - min) + min;
+      const choice = arr => arr[(Math.random() * arr.length) | 0];
+
+      // Physics parameters
+      const restitution = 0.55;  // bounciness
+      const friction = 0.995;    // air drag per frame
+      const rotFriction = 0.995; // angular drag
+      const wallSpinBoost = 0.2; // add spin on edge hits
+      const maxSpeed = 3000;
+      const minSize = 140;
+      const maxSize = 260;
+
+      // Stats
+      let throws = 0;
+      let bounces = 0;
+      let topSpeed = 0;
+
+      function updateHUD() {
+        statCount.textContent = things.size;
+        statThrows.textContent = throws;
+        statBounces.textContent = bounces;
+        statTop.textContent = Math.round(topSpeed);
+      }
+
+      function randomData(rows = 3, cols = 3) {
+        const foods = ["Tacos","Sushi","Pasta","Waffles","Dumplings","Ramen","Falafel","Pie","Curry","Burrito","Salad","Pancakes"];
+        const colsList = ["Item","Score","Spice","Crunch","Joy","Chaos","Style"];
+        const headers = [];
+        for (let c=0;c<cols;c++) headers.push(colsList[(Math.random()*colsList.length)|0]);
+        const data = [];
+        for (let r=0;r<rows;r++) {
+          const row = [];
+          row.push(choice(foods));
+          for (let c=1;c<cols;c++) row.push((Math.random()*100).toFixed(0));
+          data.push(row);
+        }
+        return { headers, data };
+      }
+
+      function makeTableElement(width) {
+        const { headers, data } = randomData(3, 3);
+        const wrap = document.createElement('div');
+        wrap.className = 'thing';
+        wrap.setAttribute('role', 'img');
+        wrap.setAttribute('aria-label', 'A flingable HTML table');
+
+        const tbl = document.createElement('table');
+        tbl.className = 'tbl';
+        tbl.style.width = width + 'px';
+
+        const thead = document.createElement('thead');
+        const hr = document.createElement('tr');
+        headers.forEach(h => {
+          const th = document.createElement('th');
+          th.textContent = h;
+          hr.appendChild(th);
+        });
+        thead.appendChild(hr);
+
+        const tbody = document.createElement('tbody');
+        data.forEach(r => {
+          const tr = document.createElement('tr');
+          r.forEach(cell => {
+            const td = document.createElement('td');
+            td.textContent = cell;
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+
+        tbl.appendChild(thead);
+        tbl.appendChild(tbody);
+        wrap.appendChild(tbl);
+        arena.appendChild(wrap);
+
+        return wrap;
+      }
+
+      function createThing(opts = {}) {
+        if (things.size >= maxThings) return null;
+
+        const id = nextId++;
+        const width = Math.round(R(minSize, maxSize));
+        const el = makeTableElement(width);
+
+        // Measure dimensions
+        el.style.transform = 'translate(-9999px,-9999px)';
+        const rect = el.getBoundingClientRect();
+        const w = rect.width, h = rect.height;
+
+        // Start position
+        const x = opts.x ?? R(40, Math.max(42, bounds.width - w - 40));
+        const y = opts.y ?? R(60, Math.max(62, bounds.height - h - 60));
+        const angle = opts.angle ?? R(-8, 8) * (Math.PI/180);
+
+        const vx = opts.vx ?? (chaos.checked ? R(-1200, 1200) : R(-200, 200));
+        const vy = opts.vy ?? (chaos.checked ? R(-1200, 200) : R(-50, 50));
+        const av = opts.av ?? R(-2, 2);
+
+        const body = {
+          id, el, w, h,
+          x, y, vx, vy, angle, av,
+          dragging: false,
+          dragOffsetX: 0, dragOffsetY: 0,
+          lastMoves: [] // recent pointer movements for release velocity
+        };
+
+        things.set(id, body);
+        el.dataset.id = id;
+
+        // Initial placement
+        applyTransform(body);
+
+        // Pointer interactions
+        el.addEventListener('pointerdown', e => onPointerDown(e, body));
+        el.addEventListener('dragstart', e => e.preventDefault()); // no native drag
+
+        updateHUD();
+        return body;
+      }
+
+      function applyTransform(b) {
+        b.el.style.transform = `translate(${b.x}px, ${b.y}px) rotate(${b.angle}rad)`;
+      }
+
+      function onPointerDown(e, body) {
+        e.preventDefault();
+        body.dragging = true;
+        body.lastMoves.length = 0;
+        body.el.classList.add('dragging');
+        body.el.setPointerCapture(e.pointerId);
+
+        const rect = body.el.getBoundingClientRect();
+        body.dragOffsetX = e.clientX - rect.left;
+        body.dragOffsetY = e.clientY - rect.top;
+
+        const onMove = (ev) => {
+          if (!body.dragging) return;
+          const nx = ev.clientX - body.dragOffsetX - bounds.left;
+          const ny = ev.clientY - body.dragOffsetY - bounds.top;
+
+          // Clamp inside arena while dragging
+          body.x = Math.max(0, Math.min(bounds.width - body.w, nx));
+          body.y = Math.max(0, Math.min(bounds.height - body.h, ny));
+          body.vx = 0; body.vy = 0; body.av = 0; // paused while dragging
+          applyTransform(body);
+
+          // Keep a small history to compute throw velocity
+          body.lastMoves.push({ t: performance.now(), x: ev.clientX, y: ev.clientY });
+          if (body.lastMoves.length > 6) body.lastMoves.shift();
+        };
+
+        const onUp = (ev) => {
+          body.el.classList.remove('dragging');
+          body.el.releasePointerCapture(ev.pointerId);
+          body.dragging = false;
+
+          // Compute release velocity from movement history
+          const hist = body.lastMoves;
+          if (hist.length >= 2) {
+            const a = hist[0], b = hist[hist.length - 1];
+            const dt = Math.max(1, b.t - a.t) / 1000; // s
+            const vx = (b.x - a.x) / dt;
+            const vy = (b.y - a.y) / dt;
+
+            // Cap speed
+            const s = Math.hypot(vx, vy);
+            const cap = Math.min(s, maxSpeed);
+            const scale = s > 0 ? cap / s : 0;
+
+            body.vx = (vx * scale);
+            body.vy = (vy * scale);
+
+            // Spin based on off-center release
+            const centerX = body.x + body.w/2 + bounds.left;
+            const centerY = body.y + body.h/2 + bounds.top;
+            const offX = ev.clientX - centerX;
+            const offY = ev.clientY - centerY;
+            // 2D cross product z = r x v
+            const cross = offX * (body.vy) - offY * (body.vx);
+            body.av = cross / (0.5 * (body.w * body.h)) * 0.5;
+
+            throws++;
+            const sp = Math.hypot(body.vx, body.vy);
+            if (sp > topSpeed) topSpeed = sp;
+            updateHUD();
+          }
+
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          window.removeEventListener('pointercancel', onUp);
+        };
+
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+      }
+
+      // Physics loop
+      let lastT = performance.now();
+      function tick(now) {
+        const dt = Math.min(0.034, (now - lastT) / 1000); // cap dt for stability
+        lastT = now;
+
+        things.forEach(b => {
+          if (b.dragging) return;
+
+          // Integrate
+          b.vy += gravity * dt;
+
+          // Apply drag
+          b.vx *= friction;
+          b.vy *= friction;
+          b.av *= rotFriction;
+
+          // Clamp speed
+          const sp = Math.hypot(b.vx, b.vy);
+          if (sp > maxSpeed) {
+            const s = maxSpeed / sp;
+            b.vx *= s; b.vy *= s;
+          }
+          if (sp > topSpeed) { topSpeed = sp; }
+
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+          b.angle += b.av * dt;
+
+          // Collisions with arena bounds
+          let hit = false;
+
+          if (b.x < 0) { b.x = 0; b.vx = -b.vx * restitution; b.av += (b.vy * wallSpinBoost) / Math.max(80, b.h); hit = true; }
+          else if (b.x + b.w > bounds.width) { b.x = bounds.width - b.w; b.vx = -b.vx * restitution; b.av -= (b.vy * wallSpinBoost) / Math.max(80, b.h); hit = true; }
+
+          if (b.y < 0) { b.y = 0; b.vy = -b.vy * restitution; b.av -= (b.vx * wallSpinBoost) / Math.max(80, b.w); hit = true; }
+          else if (b.y + b.h > bounds.height) { b.y = bounds.height - b.h; b.vy = -b.vy * restitution; b.av += (b.vx * wallSpinBoost) / Math.max(80, b.w); hit = true; }
+
+          if (hit) { bounces++; }
+
+          applyTransform(b);
+        });
+
+        updateHUD();
+        requestAnimationFrame(tick);
+      }
+
+      // Controls
+      btnAdd.addEventListener('click', () => {
+        createThing();
+      });
+
+      btnMany.addEventListener('click', () => {
+        for (let i=0;i<5;i++) createThing();
+      });
+
+      btnFlip.addEventListener('click', () => {
+        // Yeet upward and add spin
+        things.forEach(b => {
+          b.vy = -R(900, 1600);
+          b.vx += R(-200, 200);
+          b.av += R(-3, 3);
+        });
+        throws += things.size > 0 ? 1 : 0;
+        updateHUD();
+      });
+
+      btnClear.addEventListener('click', () => {
+        things.forEach(b => b.el.remove());
+        things.clear();
+        updateHUD();
+      });
+
+      // Spawn a couple initially
+      createThing({ x: 120, y: 120, vx: 120, vy: -80, av: 0.5 });
+      createThing({ x: 380, y: 90, vx: -80, vy: -60, av: -0.4 });
+      createThing({ x: 650, y: 160, vx: 60, vy: -20, av: 0.2 });
+
+      // Handle resize
+      const onResize = () => {
+        bounds = arena.getBoundingClientRect();
+        // Nudge objects back inside
+        things.forEach(b => {
+          b.x = Math.max(0, Math.min(bounds.width - b.w, b.x));
+          b.y = Math.max(0, Math.min(bounds.height - b.h, b.y));
+          applyTransform(b);
+        });
+      };
+      window.addEventListener('resize', onResize);
+
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>
